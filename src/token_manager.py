@@ -16,7 +16,7 @@ if not CLIENT_ID or not CLIENT_SECRET:
 
 TOKENS_PATH = Path(__file__).parent
 
-def load_tokens():
+def load_tokens() -> dict:
     try:
         with open(TOKENS_PATH / "tokens.json", "r") as f:
             data = json.load(f)
@@ -53,7 +53,7 @@ def load_tokens():
 
     return validated_data
 
-def create_request_params(token_data):
+def create_request_params(token_data: dict) -> tuple[dict, dict]:
     refresh_token = token_data["refresh_token"]
     data = {
         "grant_type": "refresh_token",
@@ -66,7 +66,7 @@ def create_request_params(token_data):
 
     return data, headers
 
-def write_tokens(tokens_json):
+def write_tokens(tokens_json: dict) -> None:
     try:
         with open(TOKENS_PATH / "tokens.json.tmp", "w") as f:
             json.dump(tokens_json, f)
@@ -87,7 +87,7 @@ def write_tokens(tokens_json):
         raise IOError("Atomic swap failed - tokens.json.tmp has correct data") from e
 
 
-def process_token_response(response, token_data):
+def process_token_response(response: requests.Response, token_data: dict) -> str:
     try:
         updated_token_data = response.json()
 
@@ -124,7 +124,7 @@ def process_token_response(response, token_data):
 
     return access_token
 
-def get_access_token():
+def get_access_token() -> str:
     token_data = load_tokens()
     if time.time() > token_data["expires_at"] - 60:
         data, headers = create_request_params(token_data)
@@ -137,19 +137,19 @@ def get_access_token():
                 timeout=5
             )
 
+            response.raise_for_status()
+
         except requests.exceptions.ConnectionError as e:
             raise RuntimeError("Token refresh request failed") from e
 
         except requests.exceptions.Timeout as e:
             raise RuntimeError("Token refresh timed out after 5 seconds") from e
 
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError("Token refresh request failed: unexpected network error") from e
-
-        try:
-            response.raise_for_status()
         except requests.exceptions.HTTPError as e:
             raise RuntimeError(f"Token refresh failed with HTTP error: {response.status_code}") from e
+
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError("Token refresh request failed: unexpected network error") from e
 
         access_token = process_token_response(response, token_data)
         return access_token
