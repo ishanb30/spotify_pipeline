@@ -1,4 +1,4 @@
-Project: de_project (rename pending — will match API domain once chosen)
+Project: spotify_pipeline
 
 ## Note on This File
 This CLAUDE.md currently contains substantial detail about the 6-week pre-build learning period. Once building begins, that content will be largely removed and replaced with project-specific context — architecture decisions, technical standards, constraints, and living memory relevant to the build itself.
@@ -10,7 +10,7 @@ This is the main data engineering project to be built after a 6-week self-study 
 - **Python** — orchestration (no Airflow/Dagster)
 - **Requests** — API ingestion
 
-API/domain not yet selected. Must have authentication (OAuth preferred) and pagination as a minimum.
+API: **Spotify Web API** selected. Using Authorization Code Flow (OAuth 2.0) targeting user data — specifically recently played tracks (`user-read-recently-played` scope). Pagination to be covered in Week 2.
 
 ## Pre-Build: 6-Week Learning Period
 Before building begins, there is a 6-week self-study period (30 hrs/week) targeting ~50-70% competency on each tool. Claude Code in this project will be used for learning check-ins during this period. The BI Dev rotation (starting early-to-mid June 2026) will compound Snowflake knowledge.
@@ -137,14 +137,7 @@ No new tools. Integration and judgment.
 ---
 
 ## Outstanding Setup Tasks
-1. **Snowflake trial account** — set up at the start of Week 1. Do not activate early — trial is time-limited.
-2. **Update `~/.dbt/profiles.yml`** — all fields currently set to `placeholder`. Replace with real Snowflake credentials once trial is active.
-3. **Pick API** — needs auth + pagination as the minimum. Should be selected before end of Week 1 so there is a real target for pagination and auth exercises.
-4. **Rename project** — once the API domain is chosen, rename to something domain-specific (e.g. `spotify_pipeline`). When renaming:
-   - Rename the local folder
-   - Rename the GitHub repo in settings and update the remote URL: `git remote set-url origin <new-url>`
-   - Delete and recreate `.venv/` (venvs have hardcoded paths)
-   - The dbt project name (`transform`) is unaffected
+1. **Update `~/.dbt/profiles.yml`** — all fields currently set to `placeholder`. Replace with real Snowflake credentials once trial is active.
 
 ## Learning Protocol
 I am learning by doing. **DO NOT provide code solutions unless explicitly requested with the phrase "Provide a code solution for [X]."**
@@ -161,9 +154,15 @@ I am learning by doing. **DO NOT provide code solutions unless explicitly reques
 - Test me by questioning my thought process even if I am correct — decisions must be backed by reasoning, not just intuition
 - When I check in on progress, probe uncertain areas before moving on. Do not assume understanding — verify it.
 
+## Explanation Style
+- **Never assume I know what a technical word means in context.** When introducing any term an average non-developer might not understand in a technical context (e.g. "port", "redirect", "request", "endpoint", "browser" in a networking context), define it inline the first time it appears.
+- After a technical noun, add a brief parenthetical or follow-on sentence explaining what it is in plain terms before continuing.
+- Do this the first time a term appears in an explanation, not every time.
+- I understand general concepts but not their precise technical meaning — explain the technical usage specifically.
+
 ## Project Structure
 ```
-de_project/
+spotify_pipeline/
   .venv/            — isolated Python environment (never committed)
   .gitignore
   transform/        — dbt project (all dbt commands run from inside here)
@@ -171,7 +170,29 @@ de_project/
 ```
 
 ## Living Memory
-- **Current state:** Pre-build. 6-week learning period not yet started. Setup complete — skeleton committed and pushed to GitHub. Snowflake credentials are placeholders. API not yet chosen.
-- **PyCharm:** Configured to use `.venv/bin/python`. Project root is `de_project/` — not a subdirectory.
+- **Current state:** Week 1 complete (started 2026-05-05). Theory complete. Snowflake trial active. API chosen: Spotify Web API. Project renamed to `spotify_pipeline`.
 - **dbt commands:** Must be run from inside `transform/`.
-- **Competency benchmark:** ~50-70% means a working mental model of the architecture, confident implementation, awareness of gotchas, knowing there's more but not being blocked. Modelled on the user's logging module understanding from the previous project.
+- **Competency benchmark:** ~50-70% means a working mental model of the architecture, confident implementation, awareness of gotchas, knowing there's more but not being blocked.
+- **Known gap:** retry logic not yet added to `token_manager.py` — noted for project build stage.
+- **Project-stage endpoints to consider:** `top-tracks`, `top-artists`, `audio-features` — adds depth for dbt modelling.
+- **Project-stage infrastructure:** watermark/run log table needed in Snowflake — write `played_at` timestamp per pipeline run.
+
+## Week 1 Progress
+
+### Theory (complete)
+- Ingestion patterns (batch vs polling vs event-driven) — solid. Spotify pipeline uses batch.
+- Watermarking — solid. Pipeline stores one timestamp per run, anchored to external data timestamp not pipeline run time, lives in a run log/watermark table.
+- OAuth Authorization Code Flow understood end-to-end. Took significant drilling — revisit if needed.
+- Bearer vs Basic auth distinction understood.
+- Defensive coding mindset — contract/boundary thinking applied in practice.
+
+### Snowflake (complete)
+- UI navigated, virtual warehouse concept understood.
+- Object hierarchy understood (account → database → schema → table).
+- Created database, schema, and table. Basic SQL running.
+
+### Practical
+- `src/auth.py` — complete. One-time OAuth flow, saves tokens to `src/tokens.json`.
+- `src/token_manager.py` — production-grade defensive refactor complete (atomic writes, boundary validation, error handling, 60s expiry buffer). **Revisit:** retry logic, logging, module-level credential loading on import (testability issue).
+- `src/tokens.json` — written by auth.py, never committed. Contains access_token, refresh_token, expires_at.
+- `src/fetch.py` — complete. Authenticated GET with retry logic (429, 5xx, network errors), exponential backoff + jitter, `Retry-After` header handling, response validation at boundary. Type hints added.
