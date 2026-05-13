@@ -7,6 +7,7 @@ import time
 import base64
 import requests
 
+SRC_DIR = Path(__file__).parent
 
 load_dotenv()
 CLIENT_ID = os.environ.get("CLIENT_ID")
@@ -14,11 +15,9 @@ CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
 if not CLIENT_ID or not CLIENT_SECRET:
     raise ValueError("Missing client information")
 
-TOKENS_PATH = Path(__file__).parent
-
 def load_tokens() -> dict:
     try:
-        with open(TOKENS_PATH / "tokens.json", "r") as f:
+        with open(SRC_DIR / "tokens.json", "r") as f:
             data = json.load(f)
 
     except FileNotFoundError as e:
@@ -68,20 +67,20 @@ def create_request_params(token_data: dict) -> tuple[dict, dict]:
 
 def write_tokens(tokens_json: dict) -> None:
     try:
-        with open(TOKENS_PATH / "tokens.json.tmp", "w") as f:
+        with open(SRC_DIR / "tokens.json.tmp", "w") as f:
             json.dump(tokens_json, f)
     except IOError as e:
         try:
-            os.remove(TOKENS_PATH / "tokens.json.tmp")
+            os.remove(SRC_DIR / "tokens.json.tmp")
         except IOError:
             pass
         raise IOError("Failed to write tokens.json.tmp - cleanup attempted") from e
 
     try:
-        os.replace(TOKENS_PATH / "tokens.json.tmp", TOKENS_PATH / "tokens.json")
+        os.replace(SRC_DIR / "tokens.json.tmp", SRC_DIR / "tokens.json")
     except IOError as e:
         try:
-            os.remove(TOKENS_PATH / "tokens.json.tmp")
+            os.remove(SRC_DIR / "tokens.json.tmp")
         except IOError:
             pass
         raise IOError("Atomic swap failed - tokens.json.tmp has correct data") from e
