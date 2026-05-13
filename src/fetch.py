@@ -3,10 +3,11 @@ import requests
 from token_manager import get_access_token
 import time
 import random
+from pathlib import Path
+import json
+import os
 
-
-access_token = get_access_token()
-headers = {"Authorization": f"Bearer {access_token}"}
+SRC_DIR = Path(__file__).parent
 
 def delay_retry(i: int) -> None:
     jitter = random.randint(1, 10)
@@ -81,9 +82,34 @@ def get_api_data(headers: dict, max_retries: int=3) -> dict:
 
     raise RuntimeError("Max retries exhausted") from last_exception
 
-if __name__ == "__main__":
+def write_data(headers: dict) -> None:
     data = get_api_data(headers, 3)
-    print(data)
+
+    try:
+        with open(SRC_DIR / "src_data.json.tmp", "w") as f:
+            json.dump(data, f)
+
+    except IOError as e:
+        try:
+            os.remove(SRC_DIR / "src_data.json.tmp")
+        except IOError as e:
+            pass
+        raise IOError("Failed to write src_data.json.tmp - cleanup attempted") from e
+
+    try:
+        os.replace(SRC_DIR / "src_data.json.tmp", SRC_DIR / "src_data.json")
+    except IOError as e:
+        try:
+            os.remove(SRC_DIR / "src_data.json.tmp")
+        except IOError as e:
+            pass
+        raise IOError("Atomic swap failed - src_data.json.tmp has correct data") from e
+
+if __name__ == "__main__":
+    access_token = get_access_token()
+    headers = {"Authorization": f"Bearer {access_token}"}
+    write_data(headers)
+
 
 
 
