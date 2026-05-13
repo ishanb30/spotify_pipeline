@@ -53,14 +53,10 @@ response = requests.post("https://accounts.spotify.com/api/token", data=data, he
 response.raise_for_status()
 token_data = response.json()
 
-access_token = token_data["access_token"]
-refresh_token = token_data["refresh_token"]
-expires_at = time.time() + token_data["expires_in"]
-
 tokens_json = {
-    "access_token": access_token,
-    "refresh_token": refresh_token,
-    "expires_at": expires_at
+    "access_token": token_data["access_token"],
+    "refresh_token": token_data["refresh_token"],
+    "expires_at": time.time() + token_data["expires_in"]
 }
 
 with open(Path(__file__).parent / "tokens.json", "w") as f:
