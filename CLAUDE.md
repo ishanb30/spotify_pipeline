@@ -153,6 +153,7 @@ I am learning by doing. **DO NOT provide code solutions unless explicitly reques
 - Test understanding proactively — not just whether I can do something, but whether I know why
 - Test me by questioning my thought process even if I am correct — decisions must be backed by reasoning, not just intuition
 - When I check in on progress, probe uncertain areas before moving on. Do not assume understanding — verify it.
+- Snowflake topics should be taught by combining theory with hands-on UI exploration — guide me to verify concepts in the Snowflake UI rather than just explaining them conceptually.
 
 ## Explanation Style
 - **Never assume I know what a technical word means in context.** When introducing any term an average non-developer might not understand in a technical context (e.g. "port", "redirect", "request", "endpoint", "browser" in a networking context), define it inline the first time it appears.
@@ -174,6 +175,7 @@ spotify_pipeline/
 - **dbt commands:** Must be run from inside `transform/`.
 - **Competency benchmark:** ~50-70% means a working mental model of the architecture, confident implementation, awareness of gotchas, knowing there's more but not being blocked.
 - **Known gap:** retry logic not yet added to `token_manager.py` — noted for project build stage.
+- **Known gap:** hardcoded URLs in `src/` files — refactor to named constants in `config.py` at project build stage.
 - **Project-stage endpoints to consider:** `top-tracks`, `top-artists`, `audio-features` — adds depth for dbt modelling.
 - **Project-stage infrastructure:** watermark/run log table needed in Snowflake — write `played_at` timestamp per pipeline run.
 
