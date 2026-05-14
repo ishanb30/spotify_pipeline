@@ -1,6 +1,6 @@
 
 import requests
-from token_manager import get_access_token
+from token_manager import get_auth_headers
 import time
 import random
 from pathlib import Path
@@ -12,7 +12,6 @@ SRC_DIR = Path(__file__).parent
 def delay_retry(i: int) -> None:
     jitter = random.randint(1, 10)
     time.sleep(2 ** (i + 1) + jitter)
-
 
 def validate_recently_played(response: requests.Response) -> dict:
     try:
@@ -106,8 +105,7 @@ def write_data(headers: dict) -> None:
         raise IOError("Atomic swap failed - src_data.json.tmp has correct data") from e
 
 if __name__ == "__main__":
-    access_token = get_access_token()
-    headers = {"Authorization": f"Bearer {access_token}"}
+    headers = get_auth_headers()
     write_data(headers)
 
 

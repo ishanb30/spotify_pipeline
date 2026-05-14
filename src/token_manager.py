@@ -156,3 +156,7 @@ def get_access_token() -> str:
     else:
         access_token = token_data["access_token"]
         return access_token
+
+def get_auth_headers() -> dict:
+    access_token = get_access_token()
+    return {"Authorization": f"Bearer {access_token}"}
