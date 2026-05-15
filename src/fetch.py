@@ -103,7 +103,6 @@ def get_api_data(headers: dict, max_retries: int=3) -> list:
 
         if data["cursors"]["before"]:
             cursor = data["cursors"]["before"]
-            continue
         else:
             print("No more pages left for cursor to point to")
             break
