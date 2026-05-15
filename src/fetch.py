@@ -57,7 +57,7 @@ def get_api_data(headers: dict, max_retries: int=3) -> list:
                 response = requests.get(
                     "https://api.spotify.com/v1/me/player/recently-played",
                     headers=headers,
-                    params={"before": cursor} if cursor else None,
+                    params={"before": cursor, "limit": 50} if cursor else {"limit": 50},
                     timeout=5
                 )
 
