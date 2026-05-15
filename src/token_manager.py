@@ -159,4 +159,5 @@ def get_access_token() -> str:
 
 def get_auth_headers() -> dict:
     access_token = get_access_token()
-    return {"Authorization": f"Bearer {access_token}"}
+    headers = {"Authorization": f"Bearer {access_token}"}
+    return headers
