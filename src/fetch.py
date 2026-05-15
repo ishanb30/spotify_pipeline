@@ -20,8 +20,18 @@ def validate_recently_played(response: requests.Response) -> dict:
     except requests.exceptions.JSONDecodeError as e:
         raise RuntimeError("Malformed JSON response - cannot be parsed") from e
 
-    if not data.get("items"):
-        print("Missing data from Spotify response")
+    if not isinstance(data, dict):
+        raise RuntimeError("JSON response is not a dict - cannot be validated")
+
+    if "items" not in data:
+        raise RuntimeError("Required key (items) missing from Spotify response")
+
+    if "cursors" not in data:
+        raise RuntimeError("Required key (cursors) missing from Spotify response")
+    elif "before" not in data["cursors"]:
+        raise RuntimeError("Required key (before) missing from Spotify response")
+
+    if not data["items"]:
         return data
 
     items = data["items"]
@@ -37,49 +47,68 @@ def validate_recently_played(response: requests.Response) -> dict:
 
     return data
 
-def get_api_data(headers: dict, max_retries: int=3) -> dict:
-    last_exception = None
-    for i in range(max_retries):
-        try:
-            response = requests.get(
-                "https://api.spotify.com/v1/me/player/recently-played",
-                headers=headers,
-                timeout=5
-            )
+def get_api_data(headers: dict, max_retries: int=3) -> list:
+    all_items = []
+    cursor = None
+    while True:
+        last_exception = None
+        for i in range(max_retries):
+            try:
+                response = requests.get(
+                    "https://api.spotify.com/v1/me/player/recently-played",
+                    headers=headers,
+                    params={"before": cursor} if cursor else None,
+                    timeout=5
+                )
 
-            response.raise_for_status()
-            data = validate_recently_played(response)
-            return data
+                response.raise_for_status()
+                data = validate_recently_played(response)
+                break
 
-        except requests.exceptions.ConnectionError as e:
-            delay_retry(i)
-            last_exception = e
-            continue
-
-        except requests.exceptions.Timeout as e:
-            delay_retry(i)
-            last_exception = e
-            continue
-
-        except requests.exceptions.HTTPError as e:
-            if response.status_code >= 500:
+            except requests.exceptions.ConnectionError as e:
                 delay_retry(i)
                 last_exception = e
                 continue
 
-            elif response.status_code == 429:
-                wait = int(response.headers.get("Retry-After") or 2 ** (i + 1))
-                time.sleep(wait)
+            except requests.exceptions.Timeout as e:
+                delay_retry(i)
                 last_exception = e
                 continue
 
-            else:
-                raise RuntimeError(f"Get request failed with status code: {response.status_code}") from e
+            except requests.exceptions.HTTPError as e:
+                if response.status_code >= 500:
+                    delay_retry(i)
+                    last_exception = e
+                    continue
 
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError("Get request failed") from e
+                elif response.status_code == 429:
+                    wait = int(response.headers.get("Retry-After") or 2 ** (i + 1))
+                    time.sleep(wait)
+                    last_exception = e
+                    continue
 
-    raise RuntimeError("Max retries exhausted") from last_exception
+                else:
+                    raise RuntimeError(f"Get request failed with status code: {response.status_code}") from e
+
+            except requests.exceptions.RequestException as e:
+                raise RuntimeError("Get request failed") from e
+
+        else:
+            raise RuntimeError("Max retries exhausted") from last_exception
+
+        if data["items"]:
+            all_items.extend(data["items"])
+        else:
+            print("No items data from Spotify response")
+
+        if data["cursors"]["before"]:
+            cursor = data["cursors"]["before"]
+            continue
+        else:
+            print("No more pages left for cursor to point to")
+            break
+
+    return all_items
 
 def write_data(headers: dict) -> None:
     data = get_api_data(headers, 3)
