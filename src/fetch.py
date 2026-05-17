@@ -28,6 +28,8 @@ def validate_recently_played(response: requests.Response) -> dict:
 
     if "cursors" not in data:
         raise RuntimeError("Required key (cursors) missing from Spotify response")
+    elif data["cursors"] is None:
+        print("No cursor - less than 50 records received")
     elif "before" not in data["cursors"]:
         raise RuntimeError("Required key (before) missing from Spotify response")
 
@@ -101,10 +103,13 @@ def get_api_data(headers: dict, max_retries: int=3) -> list:
         else:
             print("No items data from Spotify response")
 
-        if data["cursors"]["before"]:
-            cursor = data["cursors"]["before"]
+        if data["cursors"] is not None:
+            if data["cursors"]["before"]:
+                cursor = data["cursors"]["before"]
+            else:
+                print("No more pages left for cursor to point to")
+                break
         else:
-            print("No more pages left for cursor to point to")
             break
 
     return all_items
