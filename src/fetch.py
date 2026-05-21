@@ -165,21 +165,21 @@ def write_data(headers: dict) -> None:
             with open(SRC_DIR / "src_data.json.tmp", "w") as f:
                 json.dump(data, f)
 
-        except IOError as e:
+        except OSError as e:
             try:
                 os.remove(SRC_DIR / "src_data.json.tmp")
-            except IOError as e:
+            except OSError as e:
                 pass
-            raise IOError("Failed to write src_data.json.tmp - cleanup attempted") from e
+            raise OSError("Failed to write src_data.json.tmp - cleanup attempted") from e
 
         try:
             os.replace(SRC_DIR / "src_data.json.tmp", SRC_DIR / "src_data.json")
-        except IOError as e:
+        except OSError as e:
             try:
                 os.remove(SRC_DIR / "src_data.json.tmp")
-            except IOError as e:
+            except OSError as e:
                 pass
-            raise IOError("Atomic swap failed - src_data.json.tmp has correct data") from e
+            raise OSError("Atomic swap failed - src_data.json.tmp has correct data") from e
 
 if __name__ == "__main__":
     headers = get_auth_headers()
