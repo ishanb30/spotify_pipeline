@@ -1,7 +1,6 @@
 """
-fetch.py — Fetches recently played tracks from the Spotify Web API and writes
-them to a local JSON file (temporary scaffolding, to be replaced by Snowflake
-connector).
+fetch.py — Fetches recently played tracks from the Spotify Web API and loads
+them into a Snowflake table via a Snowflake connector.
 
 Assumptions:
     1. Valid auth headers are passed in by the caller (via token_manager).
@@ -32,20 +31,13 @@ Assumptions:
     7. No watermark lower bound is applied. Every run fetches all available
        recently played tracks. Deduplication is not handled here — deferred
        until the run log table exists in Snowflake.
-
-    8. write_data silently skips the file write if no tracks are returned.
-       The caller receives no signal that a write was skipped — upstream logs
-       in get_api_data are the only indicator.
 """
+
 import requests
-from token_manager import get_auth_headers
 import time
 import random
-from pathlib import Path
-import json
-import os
+from token_manager import get_auth_headers
 
-SRC_DIR = Path(__file__).parent
 
 def delay_retry(i: int) -> None:
     jitter = random.randint(1, 10)
@@ -157,33 +149,10 @@ def get_api_data(headers: dict, max_retries: int=3) -> list:
 
     return all_items
 
-def write_data(headers: dict) -> None:
-    data = get_api_data(headers, 3)
-
-    if data:
-        try:
-            with open(SRC_DIR / "src_data.json.tmp", "w") as f:
-                json.dump(data, f)
-
-        except OSError as e:
-            try:
-                os.remove(SRC_DIR / "src_data.json.tmp")
-            except OSError as e:
-                pass
-            raise OSError("Failed to write src_data.json.tmp - cleanup attempted") from e
-
-        try:
-            os.replace(SRC_DIR / "src_data.json.tmp", SRC_DIR / "src_data.json")
-        except OSError as e:
-            try:
-                os.remove(SRC_DIR / "src_data.json.tmp")
-            except OSError as e:
-                pass
-            raise OSError("Atomic swap failed - src_data.json.tmp has correct data") from e
 
 if __name__ == "__main__":
     headers = get_auth_headers()
-    write_data(headers)
+    data = get_api_data(headers, 3)
 
 
 
