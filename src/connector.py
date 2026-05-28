@@ -48,7 +48,8 @@ def get_connection() -> snowflake.connector.SnowflakeConnection:
             password=env_var["PASSWORD"],
             warehouse=env_var["DATA_WAREHOUSE"],
             database=env_var["DATABASE"],
-            schema=env_var["SCHEMA"]
+            schema=env_var["SCHEMA"],
+            autocommit=False
         )
 
     except snowflake.connector.errors.DatabaseError as e:
