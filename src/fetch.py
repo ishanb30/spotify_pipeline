@@ -34,14 +34,10 @@ Assumptions:
 """
 
 import requests
-import time
-import random
+from utils.helpers import delay_retry
 from token_manager import get_auth_headers
+import time
 
-
-def delay_retry(i: int) -> None:
-    jitter = random.randint(1, 10)
-    time.sleep(2 ** (i + 1) + jitter)
 
 def validate_recently_played(response: requests.Response) -> dict:
     try:
@@ -86,7 +82,7 @@ def get_api_data(headers: dict, max_retries: int=3) -> list:
     while True:
         page_number += 1
         last_exception = None
-        for i in range(max_retries):
+        for i in range(max_retries + 1):
             try:
                 response = requests.get(
                     "https://api.spotify.com/v1/me/player/recently-played",
@@ -102,24 +98,20 @@ def get_api_data(headers: dict, max_retries: int=3) -> list:
             except requests.exceptions.ConnectionError as e:
                 delay_retry(i)
                 last_exception = e
-                continue
 
             except requests.exceptions.Timeout as e:
                 delay_retry(i)
                 last_exception = e
-                continue
 
             except requests.exceptions.HTTPError as e:
                 if response.status_code >= 500:
                     delay_retry(i)
                     last_exception = e
-                    continue
 
                 elif response.status_code == 429:
                     wait = float(response.headers.get("Retry-After") or 2 ** (i + 1))
                     time.sleep(wait)
                     last_exception = e
-                    continue
 
                 else:
                     raise RuntimeError(f"Get request failed with status code: {response.status_code}") from e
@@ -128,7 +120,17 @@ def get_api_data(headers: dict, max_retries: int=3) -> list:
                 raise RuntimeError("Get request failed") from e
 
         else:
-            raise RuntimeError(f"Max retries exhausted on page {page_number}") from last_exception
+            if isinstance(last_exception, requests.exceptions.ConnectionError):
+                raise RuntimeError(f"Max retries exhausted on page {page_number}: "
+                                   f"Get request failed due to connection failure") from last_exception
+
+            if isinstance(last_exception, requests.exceptions.Timeout):
+                raise RuntimeError(f"Max retries exhausted on page {page_number}: "
+                                   f"Get request timed out") from last_exception
+
+            if isinstance(last_exception, requests.exceptions.HTTPError):
+                raise RuntimeError(f"Max retries exhausted on page {page_number}: "
+                                   f"Get request failed due to server errors or rate limits") from last_exception
 
         items = data["items"]
         if items:
