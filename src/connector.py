@@ -22,7 +22,7 @@ Assumptions:
 from dotenv import load_dotenv
 import os
 import snowflake.connector
-from utils.env import ENV_PATH
+from utils.paths import ENV_PATH
 
 def load_env() -> dict:
     load_dotenv(ENV_PATH)
