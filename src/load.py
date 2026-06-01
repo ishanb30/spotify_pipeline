@@ -9,18 +9,14 @@ Assumptions:
        silently without opening a connection
 """
 
-
-from token_manager import get_auth_headers
-from fetch import get_api_data
 from connector import get_connection
 import json
 import snowflake.connector
 from utils.helpers import delay_retry
+import uuid
+from fetch import get_api_data
 
-def load(max_retries: int=3):
-    headers = get_auth_headers()
-    data = get_api_data(headers, max_retries)
-
+def load(run_id: str, data: list, max_retries: int=3):
     if data:
         last_exception = None
         for i in range(max_retries + 1):
@@ -58,7 +54,9 @@ def load(max_retries: int=3):
 
 
 if __name__ == "__main__":
-    load(3)
+    run_id = str(uuid.uuid4())
+    data = get_api_data(run_id)
+    load(run_id, data)
 
 
 

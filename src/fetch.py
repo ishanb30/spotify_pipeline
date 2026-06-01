@@ -37,6 +37,7 @@ import requests
 from utils.helpers import delay_retry
 from token_manager import get_auth_headers
 import time
+import uuid
 
 
 def validate_recently_played(response: requests.Response) -> dict:
@@ -75,7 +76,9 @@ def validate_recently_played(response: requests.Response) -> dict:
 
     return data
 
-def get_api_data(headers: dict, max_retries: int=3) -> list:
+def get_api_data(run_id: str, max_retries: int=3) -> list:
+    headers = get_auth_headers()
+
     all_items = []
     cursor = None
     page_number = 0
@@ -153,8 +156,8 @@ def get_api_data(headers: dict, max_retries: int=3) -> list:
 
 
 if __name__ == "__main__":
-    headers = get_auth_headers()
-    data = get_api_data(headers, 3)
+      run_id = str(uuid.uuid4())
+      data = get_api_data(run_id)
 
 
 
