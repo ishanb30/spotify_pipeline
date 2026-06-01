@@ -3,4 +3,5 @@
 target/
 dbt_packages/                                                                                          
 logs/
-*.log 
+*.log
+src/tokens.json 
