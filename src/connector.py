@@ -4,7 +4,7 @@ on credentials stored in .env.
 
 Assumptions:
     1. .env exists at the project root - path resolved relative to
-        utils/env.py, not the working directory
+        utils/paths.py, not the working directory
 
     2. The six .env variable names are the exhaustive set - adding new ones
        requires updating var_names
