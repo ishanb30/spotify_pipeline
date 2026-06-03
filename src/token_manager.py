@@ -15,7 +15,7 @@ CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
 if not CLIENT_ID or not CLIENT_SECRET:
     raise ValueError("Missing client information")
 
-def load_tokens() -> dict:
+def _load_tokens() -> dict:
     try:
         with open(SRC_DIR / "tokens.json", "r") as f:
             data = json.load(f)
@@ -52,7 +52,7 @@ def load_tokens() -> dict:
 
     return validated_data
 
-def create_request_params(token_data: dict) -> tuple[dict, dict]:
+def _create_request_params(token_data: dict) -> tuple[dict, dict]:
     refresh_token = token_data["refresh_token"]
     data = {
         "grant_type": "refresh_token",
@@ -65,7 +65,7 @@ def create_request_params(token_data: dict) -> tuple[dict, dict]:
 
     return data, headers
 
-def write_tokens(tokens_json: dict) -> None:
+def _write_tokens(tokens_json: dict) -> None:
     try:
         with open(SRC_DIR / "tokens.json.tmp", "w") as f:
             json.dump(tokens_json, f)
@@ -86,7 +86,7 @@ def write_tokens(tokens_json: dict) -> None:
         raise IOError("Atomic swap failed - tokens.json.tmp has correct data") from e
 
 
-def process_token_response(response: requests.Response, token_data: dict) -> str:
+def _process_token_response(response: requests.Response, token_data: dict) -> str:
     try:
         updated_token_data = response.json()
 
@@ -119,14 +119,14 @@ def process_token_response(response: requests.Response, token_data: dict) -> str
         "expires_at": expires_at
     }
 
-    write_tokens(tokens_json)
+    _write_tokens(tokens_json)
 
     return access_token
 
-def get_access_token() -> str:
-    token_data = load_tokens()
+def _get_access_token() -> str:
+    token_data = _load_tokens()
     if time.time() > token_data["expires_at"] - 60:
-        data, headers = create_request_params(token_data)
+        data, headers = _create_request_params(token_data)
 
         try:
             response = requests.post(
@@ -150,7 +150,7 @@ def get_access_token() -> str:
         except requests.exceptions.RequestException as e:
             raise RuntimeError("Token refresh request failed: unexpected network error") from e
 
-        access_token = process_token_response(response, token_data)
+        access_token = _process_token_response(response, token_data)
         return access_token
 
     else:
@@ -158,6 +158,6 @@ def get_access_token() -> str:
         return access_token
 
 def get_auth_headers() -> dict:
-    access_token = get_access_token()
+    access_token = _get_access_token()
     headers = {"Authorization": f"Bearer {access_token}"}
     return headers

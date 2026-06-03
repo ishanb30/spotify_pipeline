@@ -24,7 +24,7 @@ import os
 import snowflake.connector
 from utils.paths import ENV_PATH
 
-def load_env() -> dict:
+def _load_env() -> dict:
     load_dotenv(ENV_PATH)
 
     var_names = ["ACCOUNT_IDENTIFIER", "USERNAME", "PASSWORD", "DATA_WAREHOUSE", "DATABASE", "SCHEMA"]
@@ -39,7 +39,7 @@ def load_env() -> dict:
     return env_var
 
 def get_connection() -> snowflake.connector.SnowflakeConnection:
-    env_var = load_env()
+    env_var = _load_env()
 
     try:
         connection = snowflake.connector.connect(
