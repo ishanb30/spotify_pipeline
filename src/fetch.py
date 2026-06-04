@@ -1,6 +1,5 @@
 """
-fetch.py — Fetches recently played tracks from the Spotify Web API and loads
-them into a Snowflake table via a Snowflake connector.
+fetch.py — Fetches recently played tracks from the Spotify Web API
 
 Assumptions:
     1. Valid auth headers are passed in by the caller (via token_manager).
@@ -15,32 +14,21 @@ Assumptions:
        when tracks are played directly from search with no playlist or album
        context.
 
-    4. The API returns items ordered most recent to oldest. The before cursor
-       moves backwards in time on each page. If this ordering were reversed,
-       the pagination loop would have no natural stopping condition and would
-       continue requesting progressively older data indefinitely.
-
-    5. Pagination termination is detected in two ways: (a) an empty items list
-       signals no more data exists; (b) a non-null page with no cursor signals
-       the last page was reached. In practice, (a) is the common case.
-
-    6. The Retry-After header, when present on a 429 response, is assumed to
+    4. The Retry-After header, when present on a 429 response, is assumed to
        be a parseable numeric string (e.g. "30" or "1.5"). If absent, falls
        back to exponential backoff.
-
-    7. No watermark lower bound is applied. Every run fetches all available
-       recently played tracks. Deduplication is not handled here — deferred
-       until the run log table exists in Snowflake.
 """
 
 import requests
 from utils.helpers import delay_retry
-from token_manager import get_auth_headers
+from src.token_manager import get_auth_headers
 import time
 import uuid
+from utils.logging import get_logger
+from src.connector import get_connection
+import snowflake.connector
 
-
-def validate_recently_played(response: requests.Response) -> dict:
+def _validate_recently_played(response: requests.Response) -> dict:
     try:
         data = response.json()
 
@@ -52,13 +40,6 @@ def validate_recently_played(response: requests.Response) -> dict:
 
     if "items" not in data:
         raise RuntimeError("Required key (items) missing from Spotify response")
-
-    if "cursors" not in data:
-        raise RuntimeError("Required key (cursors) missing from Spotify response")
-    elif data["cursors"] is None:
-        pass
-    elif "before" not in data["cursors"]:
-        raise RuntimeError("Required key (before) missing from Spotify response")
 
     if not data["items"]:
         return data
@@ -76,84 +57,120 @@ def validate_recently_played(response: requests.Response) -> dict:
 
     return data
 
+def _get_last_watermark(run_id: str, max_retries: int=3) -> int | None:
+    logger = get_logger(__name__, run_id)
+
+    last_exception = None
+    for i in range(max_retries + 1):
+        try:
+            with get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT WATERMARK_TIMESTAMP FROM SPOTIFY_PIPELINE.RAW.PIPELINE_RUNS "
+                        "WHERE RUN_STATUS = 'COMPLETED' AND WATERMARK_TIMESTAMP IS NOT NULL "
+                        "ORDER BY WATERMARK_TIMESTAMP LIMIT 1"
+                    )
+
+                    data = cursor.fetchone()
+                    if data:
+                        unix_seconds = data[0].timestamp()
+                        watermark = int(unix_seconds * 1000)
+                        logger.info(f"Last watermark: {watermark}")
+                        return watermark
+                    else:
+                        logger.info("No previous watermark found - full fetch")
+                        return None
+
+        except snowflake.connector.errors.OperationalError as e:
+            delay_retry(i)
+            last_exception = e
+            logger.warning(f"Snowflake OperationalError on attempt {i + 1}: {last_exception}")
+
+        except snowflake.connector.errors.DatabaseError as e:
+            raise RuntimeError("Failed to read watermark from PIPELINE_RUNS via Snowflake connector") from e
+
+        except OSError as e:
+            delay_retry(i)
+            last_exception = e
+            logger.warning(f"OS failure on attempt {i + 1}: {last_exception}")
+
+    else:
+        if isinstance(last_exception, snowflake.connector.errors.OperationalError):
+            raise RuntimeError("Max retries exhausted: Failed to read watermark "
+                               "from PIPELINE_RUNS via Snowflake connector") from last_exception
+
+        elif isinstance(last_exception, OSError):
+            raise RuntimeError("Max retries exhausted: Failed to read "
+                               "from Snowflake due to network error") from last_exception
+
 def get_api_data(run_id: str, max_retries: int=3) -> list:
+    logger = get_logger(__name__, run_id)
+    logger.info("fetch started")
+
     headers = get_auth_headers()
+    watermark = _get_last_watermark(run_id)
 
-    all_items = []
-    cursor = None
-    page_number = 0
-    while True:
-        page_number += 1
-        last_exception = None
-        for i in range(max_retries + 1):
-            try:
-                response = requests.get(
-                    "https://api.spotify.com/v1/me/player/recently-played",
-                    headers=headers,
-                    params={"before": cursor, "limit": 50} if cursor else {"limit": 50},
-                    timeout=5
-                )
+    last_exception = None
+    for i in range(max_retries + 1):
+        try:
+            response = requests.get(
+                "https://api.spotify.com/v1/me/player/recently-played",
+                headers=headers,
+                params={"after": watermark,"limit": 50} if watermark else {"limit": 50},
+                timeout=5
+            )
 
-                response.raise_for_status()
-                data = validate_recently_played(response)
-                break
+            response.raise_for_status()
+            data = _validate_recently_played(response)
 
-            except requests.exceptions.ConnectionError as e:
+            items = data["items"]
+            if items:
+                logger.info(f"fetch completed with {len(items)} play events")
+                return items
+            else:
+                logger.info("items is empty - no tracks listened to recently")
+                return items
+
+        except requests.exceptions.ConnectionError as e:
+            delay_retry(i)
+            last_exception = e
+            logger.warning(f"ConnectionError on attempt {i + 1}: {last_exception}")
+
+        except requests.exceptions.Timeout as e:
+            delay_retry(i)
+            last_exception = e
+            logger.warning(f"Timeout on attempt {i + 1}: {last_exception}")
+
+        except requests.exceptions.HTTPError as e:
+            if response.status_code >= 500:
                 delay_retry(i)
                 last_exception = e
+                logger.warning(f"Server error (5xx) on attempt {i + 1}: {last_exception}")
 
-            except requests.exceptions.Timeout as e:
-                delay_retry(i)
+            elif response.status_code == 429:
+                wait = float(response.headers.get("Retry-After") or 2 ** (i + 1))
+                time.sleep(wait)
                 last_exception = e
+                logger.warning(f"Rate limited (429) on attempt {i + 1}: {last_exception}")
 
-            except requests.exceptions.HTTPError as e:
-                if response.status_code >= 500:
-                    delay_retry(i)
-                    last_exception = e
+            else:
+                raise RuntimeError(f"Get request failed with status code: {response.status_code}") from e
 
-                elif response.status_code == 429:
-                    wait = float(response.headers.get("Retry-After") or 2 ** (i + 1))
-                    time.sleep(wait)
-                    last_exception = e
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError("Get request failed") from e
 
-                else:
-                    raise RuntimeError(f"Get request failed with status code: {response.status_code}") from e
+    else:
+        if isinstance(last_exception, requests.exceptions.ConnectionError):
+            raise RuntimeError(f"Max retries exhausted: "
+                               f"Get request failed due to connection failure") from last_exception
 
-            except requests.exceptions.RequestException as e:
-                raise RuntimeError("Get request failed") from e
+        if isinstance(last_exception, requests.exceptions.Timeout):
+            raise RuntimeError(f"Max retries exhausted: "
+                               f"Get request timed out") from last_exception
 
-        else:
-            if isinstance(last_exception, requests.exceptions.ConnectionError):
-                raise RuntimeError(f"Max retries exhausted on page {page_number}: "
-                                   f"Get request failed due to connection failure") from last_exception
-
-            if isinstance(last_exception, requests.exceptions.Timeout):
-                raise RuntimeError(f"Max retries exhausted on page {page_number}: "
-                                   f"Get request timed out") from last_exception
-
-            if isinstance(last_exception, requests.exceptions.HTTPError):
-                raise RuntimeError(f"Max retries exhausted on page {page_number}: "
-                                   f"Get request failed due to server errors or rate limits") from last_exception
-
-        items = data["items"]
-        if items:
-            all_items.extend(items)
-        elif page_number == 1:
-            print("Page 1 is empty - no tracks listened to recently")
-            break
-        else:
-            print(f"Pagination complete after page {page_number - 1} - no more tracks to fetch")
-            break
-
-        cursors = data["cursors"]
-        if cursors is not None and cursors["before"]:
-            cursor = cursors["before"]
-        else:
-            print(f"Pagination complete - no more pages left for cursor to point to after page {page_number - 1}")
-            break
-
-    return all_items
-
+        if isinstance(last_exception, requests.exceptions.HTTPError):
+            raise RuntimeError(f"Max retries exhausted: "
+                               f"Get request failed due to server errors or rate limits") from last_exception
 
 if __name__ == "__main__":
       run_id = str(uuid.uuid4())
