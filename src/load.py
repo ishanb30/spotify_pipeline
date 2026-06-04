@@ -6,22 +6,27 @@ Assumptions:
     2. RECENTLY_PLAYED table exists in the schema configured in .env with
        a RAW_DATA VARIANT column
     3. An empty list is an expected state, not an error — load() returns
-       silently without opening a connection
+       None without opening a connection
 """
 
-from connector import get_connection
+from src.connector import get_connection
 import json
 import snowflake.connector
 from utils.helpers import delay_retry
 import uuid
-from fetch import get_api_data
+from src.fetch import get_api_data
+from utils.logging import get_logger
+from datetime import datetime
 
-def load(run_id: str, data: list, max_retries: int=3):
+def load(run_id: str, data: list, max_retries: int=3) -> str | None:
+    logger = get_logger(__name__, run_id)
+    logger.info("load started")
+
     if data:
         last_exception = None
         for i in range(max_retries + 1):
-            with get_connection() as conn:
-                try:
+            try:
+                with get_connection() as conn:
                     with conn.cursor() as cursor:
                         for d in data:
                             cursor.execute(
@@ -29,19 +34,22 @@ def load(run_id: str, data: list, max_retries: int=3):
                                 "SELECT PARSE_JSON(%s)",
                                 (json.dumps(d),)
                             )
+                        conn.commit()
 
                         break
 
-                except snowflake.connector.errors.OperationalError as e:
-                    delay_retry(i)
-                    last_exception = e
+            except snowflake.connector.errors.OperationalError as e:
+                delay_retry(i)
+                last_exception = e
+                logger.warning(f"Snowflake OperationalError on attempt {i + 1}: {last_exception}")
 
-                except snowflake.connector.errors.DatabaseError as e:
-                    raise RuntimeError("Failed to load to RECENTLY_PLAYED via Snowflake connector") from e
+            except snowflake.connector.errors.DatabaseError as e:
+                raise RuntimeError("Failed to load to RECENTLY_PLAYED via Snowflake connector") from e
 
-                except OSError as e:
-                    delay_retry(i)
-                    last_exception = e
+            except OSError as e:
+                delay_retry(i)
+                last_exception = e
+                logger.warning(f"OS failure on attempt {i + 1}: {last_exception}")
 
         else:
             if isinstance(last_exception, snowflake.connector.errors.OperationalError):
@@ -51,6 +59,16 @@ def load(run_id: str, data: list, max_retries: int=3):
             elif isinstance(last_exception, OSError):
                 raise RuntimeError("Max retries exhausted: "
                                    "Failed to load to Snowflake due to network error") from last_exception
+
+        logger.info(f"load completed with {len(data)} play events")
+
+        dt = datetime.fromisoformat(max([d["played_at"] for d in data]))
+        watermark = dt.replace(tzinfo=None)
+        return watermark
+
+    else:
+        logger.info(f"load completed with 0 play events")
+        return None
 
 
 if __name__ == "__main__":
