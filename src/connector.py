@@ -15,8 +15,7 @@ Assumptions:
     4. Caller is responsible for closing the connection - no pooling, no
        reuse, no automatic cleanup unless caller uses with
 
-    5. Auth failures and bad config raise DatabaseError; network failures
-       raise OSError - anything outside these two categories is unhandled
+    5. Any errors propagate naturally and are handled by the callers
 """
 
 from dotenv import load_dotenv
@@ -41,22 +40,15 @@ def _load_env() -> dict:
 def get_connection() -> snowflake.connector.SnowflakeConnection:
     env_var = _load_env()
 
-    try:
-        connection = snowflake.connector.connect(
-            account=env_var["ACCOUNT_IDENTIFIER"],
-            user=env_var["USERNAME"],
-            password=env_var["PASSWORD"],
-            warehouse=env_var["DATA_WAREHOUSE"],
-            database=env_var["DATABASE"],
-            schema=env_var["SCHEMA"],
-            autocommit=False
-        )
-
-    except snowflake.connector.errors.DatabaseError as e:
-        raise RuntimeError("Failed to connect to Snowflake") from e
-
-    except OSError as e:
-        raise RuntimeError("Failed to connect to Snowflake due to network error") from e
+    connection = snowflake.connector.connect(
+        account=env_var["ACCOUNT_IDENTIFIER"],
+        user=env_var["USERNAME"],
+        password=env_var["PASSWORD"],
+        warehouse=env_var["DATA_WAREHOUSE"],
+        database=env_var["DATABASE"],
+        schema=env_var["SCHEMA"],
+        autocommit=False
+    )
 
     return connection
 
