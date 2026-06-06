@@ -18,27 +18,12 @@ Assumptions:
     5. Any errors propagate naturally and are handled by the callers
 """
 
-from dotenv import load_dotenv
-import os
 import snowflake.connector
-from utils.paths import ENV_PATH
-
-def _load_env() -> dict:
-    load_dotenv(ENV_PATH)
-
-    var_names = ["ACCOUNT_IDENTIFIER", "USERNAME", "PASSWORD", "DATA_WAREHOUSE", "DATABASE", "SCHEMA"]
-    env_var = {}
-    for var in var_names:
-        var_value = os.environ.get(var)
-        if var_value is None:
-            raise ValueError(f"Variable name ({var}) is missing from .env")
-        else:
-            env_var[var] = var_value
-
-    return env_var
+from utils.helpers import _load_env
 
 def get_connection() -> snowflake.connector.SnowflakeConnection:
-    env_var = _load_env()
+    var_names = ["ACCOUNT_IDENTIFIER", "USERNAME", "PASSWORD", "DATA_WAREHOUSE", "DATABASE", "SCHEMA"]
+    env_var = _load_env(var_names)
 
     connection = snowflake.connector.connect(
         account=env_var["ACCOUNT_IDENTIFIER"],

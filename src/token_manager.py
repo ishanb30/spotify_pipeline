@@ -1,30 +1,23 @@
 
-from dotenv import load_dotenv
 import os
 import json
-from pathlib import Path
+from utils.paths import SRC_DIR
 import time
 import base64
 import requests
-
-SRC_DIR = Path(__file__).parent
-
-load_dotenv()
-CLIENT_ID = os.environ.get("CLIENT_ID")
-CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
-if not CLIENT_ID or not CLIENT_SECRET:
-    raise ValueError("Missing client information")
+from utils.logging import get_logger
+from utils.helpers import _load_env
 
 def _load_tokens() -> dict:
     try:
         with open(SRC_DIR / "tokens.json", "r") as f:
             data = json.load(f)
 
-    except FileNotFoundError as e:
-        raise FileNotFoundError("tokens.json not found - run auth.py first") from e
-
     except json.JSONDecodeError as e:
         raise RuntimeError("Failed to parse JSON in tokens.json") from e
+
+    except FileNotFoundError as e:
+        raise FileNotFoundError("tokens.json not found - run auth.py first") from e
 
     required = {"access_token", "refresh_token", "expires_at"}
     for key in required:
@@ -53,13 +46,16 @@ def _load_tokens() -> dict:
     return validated_data
 
 def _create_request_params(token_data: dict) -> tuple[dict, dict]:
+    var_names = ["CLIENT_ID", "CLIENT_SECRET"]
+    env_var = _load_env(var_names)
+
     refresh_token = token_data["refresh_token"]
     data = {
         "grant_type": "refresh_token",
         "refresh_token": refresh_token
     }
 
-    credentials = f"{CLIENT_ID}:{CLIENT_SECRET}"
+    credentials = f"{env_var["CLIENT_ID"]}:{env_var["CLIENT_SECRET"]}"
     encoded = base64.b64encode(credentials.encode()).decode()
     headers = {"Authorization": f"Basic {encoded}"}
 
@@ -123,9 +119,12 @@ def _process_token_response(response: requests.Response, token_data: dict) -> st
 
     return access_token
 
-def _get_access_token() -> str:
+def _get_access_token(run_id: str) -> str:
+    logger = get_logger(__name__, run_id)
+
     token_data = _load_tokens()
     if time.time() > token_data["expires_at"] - 60:
+        logger.info("Requesting new access token...")
         data, headers = _create_request_params(token_data)
 
         try:
@@ -154,10 +153,11 @@ def _get_access_token() -> str:
         return access_token
 
     else:
+        logger.info("Using current access token...")
         access_token = token_data["access_token"]
         return access_token
 
-def get_auth_headers() -> dict:
-    access_token = _get_access_token()
+def get_auth_headers(run_id: str) -> dict:
+    access_token = _get_access_token(run_id)
     headers = {"Authorization": f"Bearer {access_token}"}
     return headers
