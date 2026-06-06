@@ -20,7 +20,6 @@ from datetime import datetime
 
 def load(run_id: str, data: list, max_retries: int=3) -> str | None:
     logger = get_logger(__name__, run_id)
-    logger.info("load started")
 
     if data:
         last_exception = None
@@ -60,14 +59,13 @@ def load(run_id: str, data: list, max_retries: int=3) -> str | None:
                 raise RuntimeError("Max retries exhausted: "
                                    "Failed to load to Snowflake due to network error") from last_exception
 
-        logger.info(f"load completed with {len(data)} play events")
+        logger.info(f"Load completed with {len(data)} play events")
 
-        dt = datetime.fromisoformat(max([d["played_at"] for d in data]))
-        watermark = dt.replace(tzinfo=None)
+        watermark = datetime.fromisoformat(max([d["played_at"] for d in data]))
         return watermark
 
     else:
-        logger.info(f"load completed with 0 play events")
+        logger.info(f"Load completed with 0 play events")
         return None
 
 

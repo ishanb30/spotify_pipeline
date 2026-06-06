@@ -105,7 +105,6 @@ def _get_last_watermark(run_id: str, max_retries: int=3) -> int | None:
 
 def get_api_data(run_id: str, max_retries: int=3) -> list:
     logger = get_logger(__name__, run_id)
-    logger.info("fetch started")
 
     headers = get_auth_headers()
     watermark = _get_last_watermark(run_id)
@@ -125,7 +124,7 @@ def get_api_data(run_id: str, max_retries: int=3) -> list:
 
             items = data["items"]
             if items:
-                logger.info(f"fetch completed with {len(items)} play events")
+                logger.info(f"Fetch completed with {len(items)} play events")
                 return items
             else:
                 logger.info("items is empty - no tracks listened to recently")
