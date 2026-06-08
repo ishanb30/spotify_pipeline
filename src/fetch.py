@@ -106,7 +106,7 @@ def _get_last_watermark(run_id: str, max_retries: int=3) -> int | None:
 def get_api_data(run_id: str, max_retries: int=3) -> list:
     logger = get_logger(__name__, run_id)
 
-    headers = get_auth_headers()
+    headers = get_auth_headers(run_id)
     watermark = _get_last_watermark(run_id)
 
     last_exception = None
