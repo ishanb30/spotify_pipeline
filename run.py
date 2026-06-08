@@ -53,7 +53,7 @@ def run_pipeline(run_id: str, logger) -> None:
                 _insert_pipeline_run(cursor, run_id, run_status)
                 conn.commit()
 
-                logger.info("Fetching data from API...")
+                logger.info("Starting the process to fetch data from API...")
                 data = get_api_data(run_id)
                 logger.info("Loading data to Snowflake...")
                 watermark = load(run_id, data)
@@ -66,10 +66,14 @@ def run_pipeline(run_id: str, logger) -> None:
                 else:
                     logger.info("Pipeline exited early - transformation layer skipped")
 
-                run_status = "COMPLETED"
-                _update_pipeline_run(cursor, run_id, run_status, watermark)
-                conn.commit()
-                logger.info(f"Pipeline successfully executed")
+                try:
+                    run_status = "COMPLETED"
+                    _update_pipeline_run(cursor, run_id, run_status, watermark)
+                    conn.commit()
+                    logger.info(f"Pipeline executed successfully")
+
+                except Exception as db_err:
+                    logger.error(f"Could not log COMPLETED status to Snowflake: {db_err}")
 
     except Exception as e:
         logger.critical(f"Pipeline crashed during execution: {e}", exc_info=True)
@@ -96,7 +100,6 @@ def main():
         run_pipeline(run_id, logger)
 
     except Exception as e:
-
         sys.exit(1)
 
 if __name__ == "__main__":
