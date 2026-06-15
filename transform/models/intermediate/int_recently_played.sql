@@ -9,7 +9,6 @@ select
     track_name,
     track_number,
     track_uri,
-    track_is_local,
     context_type,
     track_album:album_type::varchar(11) as album_type,
     track_album:total_tracks::int as album_total_tracks,
@@ -21,4 +20,3 @@ select
     track_album:artists as album_artists
 
 from {{ ref("stg_recently_played") }}
-
