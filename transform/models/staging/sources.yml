@@ -1,7 +1,0 @@
-
-sources:
-  - name: raw
-    database: SPOTIFY_PIPELINE
-    schema: RAW
-    tables:
-      - name: RECENTLY_PLAYED
