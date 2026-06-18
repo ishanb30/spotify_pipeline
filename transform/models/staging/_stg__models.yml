@@ -1,0 +1,8 @@
+
+models:
+  - name: stg_recently_played
+    columns:
+      - name: played_at
+        tests:
+          - unique
+          - not_null

@@ -1,0 +1,46 @@
+
+models:
+  - name: fct_play_events
+    columns:
+      - name: played_at
+        tests:
+          - unique
+          - not_null
+
+      - name: album_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref("dim_album")
+                field: id
+
+      - name: track_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref("dim_track")
+                field: id
+
+  - name: dim_album
+    columns:
+      - name: id
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_track
+    columns:
+      - name: id
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_artist
+    columns:
+      - name: id
+        tests:
+          - unique
+          - not_null
+
