@@ -1,0 +1,50 @@
+
+models:
+  - name: int_recently_played
+    description: >
+      One row per play event. Explodes the nested album object into scalar
+      album_* columns, and keeps track_artists and album_artists as VARIANT
+      arrays for downstream flattening into the bridge tables and dim_artist
+    columns:
+      - name: played_at
+        description: "{{ doc('played_at') }}"
+      - name: track_id
+        description: "{{ doc('track_id') }}"
+      - name: album_id
+        description: "{{ doc('album_id') }}"
+      - name: album_name
+        description: "The name of the album the track appears on"
+      - name: album_type
+        description: "The type of album (e.g. album, single, compilation)"
+      - name: album_total_tracks
+        description: "The total number of tracks on the album"
+      - name: album_release_date
+        description: "The album release date. Precision varies — see album_release_date_precision"
+      - name: album_release_date_precision
+        description: "The precision of album_release_date: year, month, or day"
+      - name: album_uri
+        description: "The Spotify URI for the album"
+      - name: track_artists
+        description: "Array of artist objects who performed on the track, kept as VARIANT for downstream flattening"
+      - name: album_artists
+        description: "Array of artist objects credited on the album, kept as VARIANT for downstream flattening"
+
+  - name: int_bridge_track_artists
+    description: >
+      Bridge table resolving the many-to-many relationship between tracks and
+      artists. One row per unique track/artist pair.
+    columns:
+      - name: track_id
+        description: "{{ doc('track_id') }}"
+      - name: artist_id
+        description: "{{ doc('artist_id') }}"
+
+  - name: int_bridge_album_artists
+    description: >
+      Bridge table resolving the many-to-many relationship between albums and
+      artists. One row per unique album/artist pair.
+    columns:
+      - name: album_id
+        description: "{{ doc('album_id') }}"
+      - name: artist_id
+        description: "{{ doc('artist_id') }}"

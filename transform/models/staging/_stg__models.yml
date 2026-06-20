@@ -1,8 +1,38 @@
 
 models:
   - name: stg_recently_played
+    description: >
+      Parsing fields out of the RAW_DATA (JSOn object) column from RECENTLY_PLAYED
+      table into scalar track_* columns, and keeps track_album and track_artists 
+      to be flattened downstream. Deduplication being enforced means one row
+      per play event (grain: played_at)
+
     columns:
       - name: played_at
         tests:
           - unique
           - not_null
+        description: "{{ doc('played_at') }}"
+      - name: track_id
+        tests:
+          - not_null
+        description: "{{ doc('track_id') }}"
+      - name: track_album
+        description: "An object that contains album-related metadata fields. These fields refer to the album on which the track appears"
+      - name: track_artists
+        description: "An object that contains artist-related metadata fields. These fields refer to the artists who performed on the track"
+      - name: track_disc_number
+        description: "The volume a track belongs to within a multi-disc album (usually 1)"
+      - name: track_duration_ms
+        description: "The track length in milliseconds"
+      - name: track_explicit
+        description: "A flag that states whether or not the track has explicit lyrics (true = yes it does; false = no it does not OR unknown)"
+      - name: track_name
+        description: "The name of the track"
+      - name: track_number
+        description: "The numeric position of the track. If an album has several discs, the track number is the number on the specified disc"
+      - name: track_uri
+        description: "The Spotify URI for the track"
+      - name: context_type
+        description: "The context the track was played from (e.g. album, playlist, artist)."
+

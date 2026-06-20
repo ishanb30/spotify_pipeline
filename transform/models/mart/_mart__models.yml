@@ -1,13 +1,18 @@
 
 models:
   - name: fct_play_events
+    description: >
+      One row per play event (grain: played_at). Records a single track play,
+      with foreign keys to dim_track and dim_album
     columns:
       - name: played_at
+        description: "{{ doc('played_at') }}"
         tests:
           - unique
           - not_null
 
       - name: album_id
+        description: "{{ doc('album_id') }}"
         tests:
           - not_null
           - relationships:
@@ -16,6 +21,7 @@ models:
                 field: id
 
       - name: track_id
+        description: "{{ doc('track_id') }}"
         tests:
           - not_null
           - relationships:
@@ -23,24 +29,60 @@ models:
                 to: ref("dim_track")
                 field: id
 
+      - name: playback_source
+        description: "The context the track was played from (e.g. album, playlist, artist). Sourced from context_type"
+
   - name: dim_album
+    description: "One row per unique album. Album attributes sourced from the track's nested album object."
     columns:
       - name: id
+        description: "{{ doc('album_id') }}"
         tests:
           - unique
           - not_null
+      - name: name
+        description: "The name of the album"
+      - name: type
+        description: "The type of album (e.g. album, single, compilation)"
+      - name: total_tracks
+        description: "The total number of tracks on the album"
+      - name: release_date
+        description: "The album release date. Precision varies — see release_date_precision"
+      - name: release_date_precision
+        description: "The precision of release_date: year, month, or day"
+      - name: spotify_uri
+        description: "The Spotify URI for the album"
 
   - name: dim_track
+    description: "One row per unique track (a song in a specific release context). Track-level attributes."
     columns:
       - name: id
+        description: "{{ doc('track_id') }}"
         tests:
           - unique
           - not_null
+      - name: name
+        description: "The name of the track"
+      - name: spotify_uri
+        description: "The Spotify URI for the track"
+      - name: track_number
+        description: "The track's position within its disc on the album"
+      - name: duration_ms
+        description: "The track length in milliseconds"
+      - name: is_explicit
+        description: "Whether the track has explicit lyrics (true = explicit; false = not explicit or unknown)"
+      - name: disc_number
+        description: "The disc the track belongs to within a multi-disc album (usually 1)"
 
   - name: dim_artist
+    description: "One row per unique artist, flattened from the track's artist array."
     columns:
       - name: id
+        description: "{{ doc('artist_id') }}"
         tests:
           - unique
           - not_null
-
+      - name: name
+        description: "The name of the artist"
+      - name: spotify_uri
+        description: "The Spotify URI for the artist"
