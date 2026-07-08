@@ -65,7 +65,7 @@ def load(run_id: str, data: list, max_retries: int=3) -> str | None:
         return watermark
 
     else:
-        logger.info(f"Load completed with 0 play events")
+        logger.info(f"Load skipped due to 0 play events")
         return None
 
 
