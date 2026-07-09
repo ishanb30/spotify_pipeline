@@ -75,6 +75,8 @@ def run_pipeline(run_id: str, logger) -> None:
                 except Exception as db_err:
                     logger.error(f"Could not log COMPLETED status to Snowflake: {db_err}")
 
+                    raise
+
     except Exception as e:
         logger.critical(f"Pipeline crashed during execution: {e}", exc_info=True)
 
@@ -89,7 +91,7 @@ def run_pipeline(run_id: str, logger) -> None:
         except Exception as db_err:
             logger.error(f"Could not log FAILED status to Snowflake: {db_err}")
 
-        raise e
+        raise
 
 def main():
     run_id = str(uuid.uuid4())
