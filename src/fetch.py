@@ -108,6 +108,7 @@ def get_api_data(run_id: str, max_retries: int=3) -> list:
 
     headers = get_auth_headers(run_id)
     watermark = _get_last_watermark(run_id)
+    watermark_with_75min_lookback = watermark - (75 * 60 * 1000)
 
     last_exception = None
     for i in range(max_retries + 1):
@@ -115,7 +116,7 @@ def get_api_data(run_id: str, max_retries: int=3) -> list:
             response = requests.get(
                 "https://api.spotify.com/v1/me/player/recently-played",
                 headers=headers,
-                params={"after": watermark,"limit": 50} if watermark else {"limit": 50},
+                params={"after": watermark_with_75min_lookback,"limit": 50} if watermark else {"limit": 50},
                 timeout=5
             )
 
