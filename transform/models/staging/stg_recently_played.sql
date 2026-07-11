@@ -1,5 +1,13 @@
 
-with deduplication as (
+{{
+    config(
+        materialized="incremental",
+        incremental_strategy="merge",
+        unique_key="played_at"
+    )
+}}
+
+with new_rows as (
     select
         raw_data:played_at::timestamp_tz as played_at,
         raw_data:track:id::varchar as track_id,
@@ -11,10 +19,22 @@ with deduplication as (
         raw_data:track:name::varchar as track_name,
         raw_data:track:track_number::int as track_number,
         raw_data:track:uri::varchar as track_uri,
-        raw_data:context:type::varchar(15) as context_type,
-        row_number() over (partition by played_at order by played_at) as rn
+        raw_data:context:type::varchar(15) as context_type
 
-    from {{ source("raw", "RECENTLY_PLAYED") }}
+    from
+        {{ source("raw", "RECENTLY_PLAYED") }}
+
+    {% if is_incremental() %}
+    where
+        played_at > (select max(played_at) - interval '75 minutes' from {{ this }})
+    {% endif %}
+)
+, deduplication as (
+    select
+        *,
+        row_number() over (partition by played_at order by played_at) as rn
+    from
+        new_rows
 )
 
 select
@@ -30,5 +50,7 @@ select
     track_uri,
     context_type
 
-from deduplication
-where rn = 1
+from
+    deduplication
+where
+    rn = 1
