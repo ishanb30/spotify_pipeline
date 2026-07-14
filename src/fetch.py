@@ -108,7 +108,7 @@ def get_api_data(run_id: str, max_retries: int=3) -> list:
 
     headers = get_auth_headers(run_id)
     watermark = _get_last_watermark(run_id)
-    watermark_with_75min_lookback = watermark - (75 * 60 * 1000)
+    watermark_with_75min_lookback = watermark - (75 * 60 * 1000) if watermark else None
 
     last_exception = None
     for i in range(max_retries + 1):
