@@ -16,6 +16,9 @@ clean-targets:         # directories to be removed by `dbt clean`
   - "target"
   - "dbt_packages"
 
+vars:
+  lookback_window_mins: 75
+
 models:
   transform:
     staging:

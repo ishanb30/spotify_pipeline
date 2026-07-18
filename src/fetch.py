@@ -27,6 +27,8 @@ import uuid
 from utils.logging import get_logger
 from src.connector import get_connection
 import snowflake.connector
+import yaml
+from utils.paths import DBT_DIR
 
 def _validate_recently_played(response: requests.Response) -> dict:
     try:
@@ -103,12 +105,27 @@ def _get_last_watermark(run_id: str, max_retries: int=3) -> int | None:
             raise RuntimeError("Max retries exhausted: Failed to read "
                                "from Snowflake due to network error") from last_exception
 
+def _get_lookback_window_mins(run_id: str) -> int:
+    logger = get_logger(__name__, run_id)
+
+    with open (DBT_DIR / 'dbt_project.yml') as f:
+        try:
+            lookback_window_mins = yaml.safe_load(f)["vars"]["lookback_window_mins"]
+            logger.debug(f"Lookback window: {lookback_window_mins} minutes")
+        except KeyError as e:
+            raise RuntimeError("Missing key: either vars or lookback_window_mins") from e
+
+    return lookback_window_mins
+
 def get_api_data(run_id: str, max_retries: int=3) -> list:
     logger = get_logger(__name__, run_id)
 
     headers = get_auth_headers(run_id)
+
     watermark = _get_last_watermark(run_id)
-    watermark_with_75min_lookback = watermark - (75 * 60 * 1000) if watermark else None
+    lookback_window_mins = _get_lookback_window_mins(run_id)
+    watermark_with_lookback = watermark - (lookback_window_mins * 60 * 1000) if watermark else None
+    logger.debug(f"after parameter used: {watermark_with_lookback}")
 
     last_exception = None
     for i in range(max_retries + 1):
@@ -116,7 +133,7 @@ def get_api_data(run_id: str, max_retries: int=3) -> list:
             response = requests.get(
                 "https://api.spotify.com/v1/me/player/recently-played",
                 headers=headers,
-                params={"after": watermark_with_75min_lookback,"limit": 50} if watermark else {"limit": 50},
+                params={"after": watermark_with_lookback,"limit": 50} if watermark else {"limit": 50},
                 timeout=5
             )
 
