@@ -26,7 +26,7 @@ with new_rows as (
 
     {% if is_incremental() %}
     where
-        played_at > (select max(played_at) - interval '{{ var('lookback_window_mins') }} minutes' from {{ this }}
+        played_at > (select max(played_at) - interval '{{ var('lookback_window_mins') }} minutes' from {{ this }})
     {% endif %}
 )
 , deduplication as (
