@@ -108,14 +108,15 @@ def _get_last_watermark(run_id: str, max_retries: int=3) -> int | None:
 def _get_lookback_window_mins(run_id: str) -> int:
     logger = get_logger(__name__, run_id)
 
-    with open (DBT_DIR / 'dbt_project.yml') as f:
-        try:
+    try:
+        with open(DBT_DIR / 'dbt_project.yml') as f:
             lookback_window_mins = yaml.safe_load(f)["vars"]["lookback_window_mins"]
             logger.debug(f"Lookback window: {lookback_window_mins} minutes")
-        except KeyError as e:
-            raise RuntimeError("Missing key: either vars or lookback_window_mins") from e
 
-    return lookback_window_mins
+            return lookback_window_mins
+
+    except KeyError as e:
+        raise RuntimeError("Missing key: either vars or lookback_window_mins") from e
 
 def get_api_data(run_id: str, max_retries: int=3) -> list:
     logger = get_logger(__name__, run_id)
